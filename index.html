@@ -188,8 +188,8 @@
   <div class="card">
     <h2>Trade hinzufügen</h2>
     <p class="muted" style="font-size:0.8rem;margin-bottom:8px;">
-      Trage pro Trade die <strong>Menge</strong> und den <strong>Betrag in EUR</strong> ein.
-      Bei <strong>Kauf</strong>: investierter Betrag · bei <strong>Verkauf</strong>: Erlös.
+      Trage pro Trade die <strong>Menge</strong> und den <strong>Betrag in EUR</strong> ein.<br>
+      <strong>Kauf</strong>: investierter Betrag · <strong>Verkauf</strong>: Erlös · <strong>Reward</strong>: Staking/Airdrops (Basis wird nicht erhöht).
     </p>
     <div class="row">
       <div class="col">
@@ -197,6 +197,7 @@
         <select id="tradeType">
           <option value="buy">Kauf</option>
           <option value="sell">Verkauf</option>
+          <option value="reward">Reward (Staking)</option>
         </select>
       </div>
       <div class="col">
@@ -208,7 +209,7 @@
         <input type="number" step="0.00000001" id="amount" placeholder="z.B. 0.25" />
       </div>
       <div class="col">
-        <label for="value">Betrag (€)</label>
+        <label for="value">Betrag in EUR</label>
         <input type="number" step="0.01" id="value" placeholder="z.B. 1500" />
       </div>
     </div>
@@ -226,9 +227,13 @@
     <div class="inline-actions">
       <div>
         <h2 style="display:inline;">Portfolio-Übersicht</h2>
-        <span class="pill">Währung: EUR</span>
+        <span class="pill" id="fiatDisplay">Währung: EUR</span>
       </div>
-      <div>
+      <div style="display:flex; gap:6px; align-items:center;">
+        <select id="fiatSelect">
+          <option value="eur">EUR</option>
+          <option value="usd">USD</option>
+        </select>
         <button class="secondary" id="refreshPricesBtn">Preise aktualisieren</button>
       </div>
     </div>
@@ -247,7 +252,7 @@
             <th>Aktuell</th>
             <th>Investiert (Basis)</th>
             <th>Wert aktuell</th>
-            <th>PnL €</th>
+            <th>PnL</th>
             <th>PnL %</th>
           </tr>
         </thead>
@@ -262,7 +267,8 @@
     <canvas id="allocationChart" width="300" height="300" style="max-width:100%;"></canvas>
     <p class="muted" style="font-size:0.75rem;margin-top:6px;">
       <strong>Richtwerte (langfristig):</strong><br />
-      BTC: ca. 60 - 80 % · ETH: ca. 10 - 20 % · Alts je 5 %
+      BTC: ca. 40–60 % · ETH: ca. 20–35 % · SOL: ca. 5–15 % ·
+      XRP + andere Alts: zusammen max. 20–30 %.
     </p>
   </div>
 
@@ -283,7 +289,7 @@
             <th class="left">Typ</th>
             <th class="left">Coin</th>
             <th>Menge</th>
-            <th>Betrag (€)</th>
+            <th>Betrag (EUR)</th>
             <th>Preis/Einheit</th>
             <th class="left">Plattform</th>
             <th>Aktion</th>
@@ -298,8 +304,9 @@
     Live-Preise von CoinGecko · Nur zu Informationszwecken, keine Anlageberatung.
   </div>
 
-  <!-- Chart.js für Tortendiagramm -->
+  <!-- Chart.js + Datalabels -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
 
   <script>
     var LOCAL_STORAGE_TRADES_KEY = "cryptoTrades_v1";
@@ -314,8 +321,14 @@
 
     var trades = [];
     var coinsConfig = {};
-    var pricesEUR = {};
+    var prices = { eur: {}, usd: {} };
+    var eurToUsd = 1;
+    var fiatCurrency = "eur"; // "eur" oder "usd"
     var allocationChart = null;
+
+    if (typeof Chart !== "undefined" && typeof ChartDataLabels !== "undefined") {
+      Chart.register(ChartDataLabels);
+    }
 
     function loadTrades() {
       var raw = localStorage.getItem(LOCAL_STORAGE_TRADES_KEY);
@@ -465,7 +478,10 @@
         tdDate.className = "left";
 
         var tdType = document.createElement("td");
-        tdType.textContent = type === "buy" ? "Kauf" : "Verkauf";
+        tdType.textContent =
+          type === "buy" ? "Kauf" :
+          type === "sell" ? "Verkauf" :
+          "Reward";
         tdType.className = "left";
 
         var tdCoin = document.createElement("td");
@@ -478,7 +494,7 @@
         var tdVal = document.createElement("td");
         tdVal.textContent = formatNumber(valueEUR, 2);
 
-        var pricePerUnit = trade.amount > 0 ? valueEUR / trade.amount : null;
+        var pricePerUnit = (trade.amount > 0 && valueEUR > 0) ? valueEUR / trade.amount : null;
         var tdPpu = document.createElement("td");
         tdPpu.textContent = formatNumber(pricePerUnit, 2);
 
@@ -511,7 +527,7 @@
       });
     }
 
-    // Durchschnittskurs & Basis mit Käufen/Verkäufen
+    // Käufe, Verkäufe, Rewards -> Bestände + Basis (in EUR)
     function computeSummary() {
       var perCoinTrades = {};
       trades.forEach(function(trade) {
@@ -524,26 +540,29 @@
       Object.keys(perCoinTrades).forEach(function(coin) {
         var list = perCoinTrades[coin].slice().sort(function(a,b){ return a.id - b.id; });
         var amount = 0;
-        var basis = 0;
+        var basis = 0; // immer in EUR
 
         list.forEach(function(trade) {
           var type = trade.type || "buy";
           var valueEUR = trade.valueEUR != null ? trade.valueEUR : trade.investedEUR;
+
           if (type === "buy") {
             amount += trade.amount;
             basis += valueEUR;
-          } else {
+          } else if (type === "sell") {
             var sellQty = trade.amount;
             if (sellQty > amount) sellQty = amount;
             var avg = amount > 0 ? basis / amount : 0;
             basis -= avg * sellQty;
             amount -= sellQty;
+          } else if (type === "reward") {
+            amount += trade.amount; // Gratis-Coins: Menge rauf, Basis bleibt
           }
         });
 
         summary[coin] = {
           amount: amount,
-          investedBasis: basis
+          investedBasisEUR: basis
         };
       });
 
@@ -558,10 +577,7 @@
         allocationChart.destroy();
         allocationChart = null;
       }
-
-      if (!values.length) {
-        return;
-      }
+      if (!values.length) return;
 
       var ctx = canvas.getContext("2d");
       allocationChart = new Chart(ctx, {
@@ -581,6 +597,18 @@
             legend: {
               position: "bottom",
               labels: { color: "#e5e7eb" }
+            },
+            datalabels: {
+              color: "#f9fafb",
+              font: { size: 10 },
+              formatter: function(value, ctx) {
+                var dataArr = ctx.chart.data.datasets[0].data;
+                var total = 0;
+                for (var i = 0; i < dataArr.length; i++) total += dataArr[i];
+                if (!total) return "";
+                var pct = value / total * 100;
+                return pct.toFixed(1) + "%";
+              }
             }
           }
         }
@@ -596,6 +624,7 @@
       var totalValueNow = 0;
       var labels = [];
       var values = [];
+      var currencySymbol = (fiatCurrency === "eur") ? "€" : "$";
 
       var symbolsSet = {};
       Object.keys(coinsConfig).forEach(function(sym){ symbolsSet[sym]=true; });
@@ -603,24 +632,44 @@
       var symbols = Object.keys(symbolsSet).sort();
 
       symbols.forEach(function(symbol) {
-        var data = summary[symbol] || { amount: 0, investedBasis: 0 };
-        if (data.amount === 0 && data.investedBasis === 0) return;
+        var data = summary[symbol] || { amount: 0, investedBasisEUR: 0 };
+        if (data.amount === 0 && data.investedBasisEUR === 0) return;
 
-        var avgPrice = data.amount > 0 ? data.investedBasis / data.amount : null;
-        var currentPrice = pricesEUR[symbol] != null ? pricesEUR[symbol] : null;
-        var currentValue = currentPrice !== null ? data.amount * currentPrice : null;
+        var amount = data.amount;
+        var basisEUR = data.investedBasisEUR;
 
-        if (data.investedBasis) totalInvested += data.investedBasis;
-        if (currentValue !== null) totalValueNow += currentValue;
+        var priceEur = prices.eur[symbol] != null ? prices.eur[symbol] : null;
+        var priceUsd = prices.usd[symbol] != null ? prices.usd[symbol] : null;
 
-        if (currentValue !== null && currentValue > 0) {
-          labels.push(symbol);
-          values.push(currentValue);
+        var avgPriceEur = amount > 0 ? basisEUR / amount : null;
+        var avgPriceDisplay = null;
+        if (avgPriceEur !== null) {
+          avgPriceDisplay = (fiatCurrency === "eur")
+            ? avgPriceEur
+            : (eurToUsd * avgPriceEur);
         }
 
-        var pnlAbs = currentValue !== null ? currentValue - data.investedBasis : null;
-        var pnlPct = (currentValue !== null && data.investedBasis > 0)
-          ? (currentValue / data.investedBasis - 1) * 100
+        var currentPriceDisplay = null;
+        if (fiatCurrency === "eur" && priceEur !== null) currentPriceDisplay = priceEur;
+        if (fiatCurrency === "usd" && priceUsd !== null) currentPriceDisplay = priceUsd;
+
+        var currentValueDisplay = null;
+        if (fiatCurrency === "eur" && priceEur !== null) currentValueDisplay = amount * priceEur;
+        if (fiatCurrency === "usd" && priceUsd !== null) currentValueDisplay = amount * priceUsd;
+
+        var basisDisplay = (fiatCurrency === "eur") ? basisEUR : basisEUR * eurToUsd;
+
+        if (basisDisplay) totalInvested += basisDisplay;
+        if (currentValueDisplay !== null) totalValueNow += currentValueDisplay;
+
+        if (currentValueDisplay !== null && currentValueDisplay > 0) {
+          labels.push(symbol);
+          values.push(currentValueDisplay);
+        }
+
+        var pnlAbs = (currentValueDisplay !== null) ? (currentValueDisplay - basisDisplay) : null;
+        var pnlPct = (currentValueDisplay !== null && basisDisplay > 0)
+          ? (currentValueDisplay / basisDisplay - 1) * 100
           : null;
 
         var tr = document.createElement("tr");
@@ -630,28 +679,32 @@
         tdCoin.textContent = symbol;
 
         var tdAmount = document.createElement("td");
-        tdAmount.textContent = formatNumber(data.amount, 8);
+        tdAmount.textContent = formatNumber(amount, 8);
 
         var tdAvg = document.createElement("td");
-        tdAvg.textContent = formatNumber(avgPrice, 2);
+        tdAvg.textContent = formatNumber(avgPriceDisplay, 2);
 
         var tdCur = document.createElement("td");
-        tdCur.textContent = currentPrice !== null ? formatNumber(currentPrice, 2) : "-";
+        tdCur.textContent = formatNumber(currentPriceDisplay, 2);
 
         var tdInv = document.createElement("td");
-        tdInv.textContent = formatNumber(data.investedBasis, 2);
+        tdInv.textContent = (basisDisplay != null && !isNaN(basisDisplay))
+          ? formatNumber(basisDisplay, 2) + " " + currencySymbol
+          : "-";
 
         var tdVal = document.createElement("td");
-        tdVal.textContent = currentValue !== null ? formatNumber(currentValue, 2) : "-";
+        tdVal.textContent = (currentValueDisplay != null && !isNaN(currentValueDisplay))
+          ? formatNumber(currentValueDisplay, 2) + " " + currencySymbol
+          : "-";
 
         var tdPnlEur = document.createElement("td");
-        if (pnlAbs !== null) {
-          tdPnlEur.textContent = formatNumber(pnlAbs, 2);
+        if (pnlAbs !== null && !isNaN(pnlAbs)) {
+          tdPnlEur.textContent = formatNumber(pnlAbs, 2) + " " + currencySymbol;
           tdPnlEur.className = pnlAbs >= 0 ? "green" : "red";
         } else tdPnlEur.textContent = "-";
 
         var tdPnlPct = document.createElement("td");
-        if (pnlPct !== null) {
+        if (pnlPct !== null && !isNaN(pnlPct)) {
           tdPnlPct.textContent = formatNumber(pnlPct, 2) + " %";
           tdPnlPct.className = pnlPct >= 0 ? "green" : "red";
         } else tdPnlPct.textContent = "-";
@@ -670,23 +723,23 @@
       var totalsDiv = document.getElementById("portfolioTotals");
       var html = "";
       html += '<div><span class="muted">Investiert (Basis) gesamt:</span> <strong>' +
-              formatNumber(totalInvested, 2) + ' €</strong></div>';
+              formatNumber(totalInvested, 2) + " " + currencySymbol + "</strong></div>";
       html += '<div><span class="muted">Aktueller Wert:</span> <strong>' +
-              formatNumber(totalValueNow, 2) + ' €</strong></div>';
+              formatNumber(totalValueNow, 2) + " " + currencySymbol + "</strong></div>";
       var totalPnl = totalValueNow - totalInvested;
       var totalPnlPct = totalInvested > 0 ? (totalValueNow / totalInvested - 1) * 100 : null;
 
       html += '<div><span class="muted">PnL gesamt:</span> ';
       if (!isNaN(totalPnl)) {
         var cls = totalPnl >= 0 ? "green" : "red";
-        html += '<strong class="' + cls + '">' + formatNumber(totalPnl, 2) + ' €</strong>';
+        html += '<strong class="' + cls + '">' + formatNumber(totalPnl, 2) + " " + currencySymbol + "</strong>";
         if (totalPnlPct !== null) {
-          html += ' <span class="' + cls + '">(' + formatNumber(totalPnlPct, 2) + ' %)</span>';
+          html += ' <span class="' + cls + '">(' + formatNumber(totalPnlPct, 2) + " %)</span>";
         }
       } else {
-        html += '-';
+        html += "-";
       }
-      html += '</div>';
+      html += "</div>";
       totalsDiv.innerHTML = html;
 
       updateAllocationChart(labels, values);
@@ -703,7 +756,7 @@
 
       if (symbols.length === 0) {
         statusEl.textContent = "Keine Coins konfiguriert – keine Preise geladen.";
-        pricesEUR = {};
+        prices = { eur: {}, usd: {} };
         renderSummary();
         return;
       }
@@ -718,13 +771,13 @@
       var idsArr = Object.keys(idsSet);
       if (idsArr.length === 0) {
         statusEl.textContent = "Für keine Coins ist eine CoinGecko-ID konfiguriert.";
-        pricesEUR = {};
+        prices = { eur: {}, usd: {} };
         renderSummary();
         return;
       }
 
       var url = "https://api.coingecko.com/api/v3/simple/price?ids=" +
-                encodeURIComponent(idsArr.join(",")) + "&vs_currencies=eur";
+                encodeURIComponent(idsArr.join(",")) + "&vs_currencies=eur,usd";
 
       fetch(url)
         .then(function(res){
@@ -732,21 +785,28 @@
           return res.json();
         })
         .then(function(data){
-          var newPrices = {};
+          var newEur = {};
+          var newUsd = {};
+          var firstRateDone = false;
+
           symbols.forEach(function(symbol){
             var cfg = coinsConfig[symbol];
-            if (!cfg.id) {
-              newPrices[symbol] = null;
-            } else {
-              var apiObj = data[cfg.id];
-              if (apiObj && typeof apiObj.eur === "number") {
-                newPrices[symbol] = apiObj.eur;
-              } else {
-                newPrices[symbol] = null;
-              }
+            var eur = null, usd = null;
+            if (cfg.id && data[cfg.id]) {
+              if (typeof data[cfg.id].eur === "number") eur = data[cfg.id].eur;
+              if (typeof data[cfg.id].usd === "number") usd = data[cfg.id].usd;
+            }
+            newEur[symbol] = eur;
+            newUsd[symbol] = usd;
+
+            if (!firstRateDone && eur && usd) {
+              eurToUsd = usd / eur;
+              firstRateDone = true;
             }
           });
-          pricesEUR = newPrices;
+          prices.eur = newEur;
+          prices.usd = newUsd;
+
           var time = new Date().toLocaleTimeString("de-DE",
             {hour:"2-digit", minute:"2-digit"});
           statusEl.textContent = "Preise aktualisiert um " + time + " (CoinGecko)";
@@ -767,12 +827,20 @@
       var platform = document.getElementById("platform").value.trim();
 
       if (!coin) { alert("Bitte Coin wählen."); return; }
-      if (isNaN(amount) || amount <= 0 || isNaN(valueEUR) || valueEUR <= 0) {
-        alert("Bitte Menge > 0 und Betrag > 0 eingeben.");
+      if (isNaN(amount) || amount <= 0) {
+        alert("Bitte Menge > 0 eingeben.");
         return;
       }
 
-      // prüfen, ob genug Bestand für Verkauf
+      if (type === "buy" || type === "sell") {
+        if (isNaN(valueEUR) || valueEUR <= 0) {
+          alert("Bitte bei Kauf/Verkauf einen Betrag (EUR) > 0 eingeben.");
+          return;
+        }
+      } else if (type === "reward") {
+        if (isNaN(valueEUR) || valueEUR < 0) valueEUR = 0;
+      }
+
       if (type === "sell") {
         var summary = computeSummary();
         var currentAmt = summary[coin] ? summary[coin].amount : 0;
@@ -836,6 +904,13 @@
       document.getElementById("newCoinSymbol").value = "";
       document.getElementById("newCoinName").value = "";
       document.getElementById("newCoinId").value = "";
+    });
+
+    document.getElementById("fiatSelect").addEventListener("change", function() {
+      fiatCurrency = this.value;
+      var pill = document.getElementById("fiatDisplay");
+      pill.textContent = "Währung: " + fiatCurrency.toUpperCase();
+      renderSummary();
     });
 
     (function init(){
