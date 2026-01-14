@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <title>Krypto Portfolio Tracker</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      margin: 0;
+      padding: 16px;
+      background: #0b1120;
+      color: #e5e7eb;
+    }
+
+    h1, h2, h3 {
+      margin: 0 0 8px;
+    }
+
+    h1 {
+      font-size: 1.6rem;
+      margin-bottom: 12px;
+    }
+
+    .card {
+      background: #020617;
+      padding: 12px;
+      border-radius: 12px;
+      margin-bottom: 12px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+      border: 1px solid #1e293b;
+    }
+
+    label {
+      font-size: 0.8rem;
+      display: block;
+      margin-bottom: 4px;
+      color: #9ca3af;
+    }
+
+    input, select {
+      width: 100%;
+      padding: 8px 10px;
+      margin-bottom: 8px;
+      border-radius: 8px;
+      border: 1px solid #1f2933;
+      background: #020617;
+      color: #e5e7eb;
+      font-size: 0.95rem;
+      box-sizing: border-box;
+    }
+
+    input:focus, select:focus {
+      outline: none;
+      border-color: #38bdf8;
+      box-shadow: 0 0 0 1px #38bdf8;
+    }
+
+    button {
+      padding: 9px 12px;
+      border-radius: 999px;
+      border: none;
+      font-size: 0.95rem;
+      cursor: pointer;
+      background: linear-gradient(135deg, #22c55e, #38bdf8);
+      color: #020617;
+      font-weight: 600;
+      width: 100%;
+      margin-top: 4px;
+    }
+
+    button.secondary {
+      background: #020617;
+      border: 1px solid #38bdf8;
+      color: #e5e7eb;
+      width: auto;
+    }
+
+    button.danger {
+      background: #7f1d1d;
+      color: #fee2e2;
+      border: 1px solid #b91c1c;
+      padding: 4px 8px;
+      font-size: 0.75rem;
+      border-radius: 999px;
+      width: auto;
+    }
+
+    button.small {
+      padding: 4px 8px;
+      font-size: 0.8rem;
+      border-radius: 999px;
+      width: auto;
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: default;
+    }
+
+    .row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .col {
+      flex: 1 1 0;
+      min-width: 90px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8rem;
+    }
+
+    th, td {
+      padding: 6px 4px;
+      text-align: right;
+    }
+
+    th {
+      color: #9ca3af;
+      border-bottom: 1px solid #1f2933;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+
+    td {
+      border-bottom: 1px solid #020617;
+      white-space: nowrap;
+    }
+
+    td.left, th.left {
+      text-align: left;
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      border: 1px solid #1f2933;
+      background: #020617;
+    }
+
+    .green {
+      color: #4ade80;
+    }
+
+    .red {
+      color: #f97373;
+    }
+
+    .muted {
+      color: #6b7280;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      background: #082f49;
+      color: #e0f2fe;
+      border: 1px solid #38bdf8;
+      margin-left: 4px;
+    }
+
+    .footer {
+      margin-top: 12px;
+      font-size: 0.75rem;
+      color: #6b7280;
+      text-align: center;
+    }
+
+    .inline-actions {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      margin-top: 6px;
+      flex-wrap: wrap;
+    }
+
+    @media (min-width: 640px) {
+      body {
+        max-width: 640px;
+        margin: 0 auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- JS-Fehler-Detektor -->
+  <script>
+    window.onerror = function (message, source, lineno, colno, error) {
+      alert("JS-Fehler: " + message + " (Zeile " + lineno + ")");
+    };
+  </script>
+
+  <h1>Krypto Portfolio Tracker <span class="badge">flexible Coins</span></h1>
+
+  <!-- Coins verwalten -->
+  <div class="card">
+    <div class="inline-actions">
+      <h2>Coins verwalten</h2>
+      <span class="muted" style="font-size:0.75rem;">
+        Hier legst du fest, welche Coins im Tool verfügbar sind.
+      </span>
+    </div>
+
+    <div class="row" style="margin-top:8px;">
+      <div class="col">
+        <label for="newCoinSymbol">Symbol</label>
+        <input id="newCoinSymbol" placeholder="z.B. BTC, ETH, SOL, XRP, LINK" />
+      </div>
+      <div class="col">
+        <label for="newCoinName">Name</label>
+        <input id="newCoinName" placeholder="z.B. Bitcoin, Chainlink..." />
+      </div>
+      <div class="col">
+        <label for="newCoinId">CoinGecko-ID</label>
+        <input id="newCoinId" placeholder="z.B. bitcoin, ethereum, solana, ripple" />
+      </div>
+    </div>
+    <button id="addCoinBtn" class="small">Coin hinzufügen</button>
+
+    <div style="overflow-x:auto;margin-top:10px;">
+      <table>
+        <thead>
+          <tr>
+            <th class="left">Symbol</th>
+            <th class="left">Name</th>
+            <th class="left">CoinGecko-ID</th>
+            <th>Aktion</th>
+          </tr>
+        </thead>
+        <tbody id="coinsBody">
+          <!-- Coins-Liste -->
+        </tbody>
+      </table>
+    </div>
+    <p class="muted" style="font-size:0.7rem;margin-top:6px;">
+      Hinweis: Die <strong>CoinGecko-ID</strong> findest du z.B. in der URL auf CoinGecko.  
+      Beispiele: bitcoin, ethereum, solana, ripple, chainlink, cardano, dogecoin…
+    </p>
+  </div>
+
+  <!-- Eingabe-Form für Trades -->
+  <div class="card">
+    <h2>Trade hinzufügen</h2>
+    <p class="muted" style="font-size:0.8rem;margin-bottom:8px;">
+      Trage pro Trade die <strong>Menge</strong> und deinen <strong>investierten Betrag in EUR</strong> ein.
+    </p>
+    <div class="row">
+      <div class="col">
+        <label for="coin">Coin</label>
+        <select id="coin">
+          <!-- per JS befüllt -->
+        </select>
+      </div>
+      <div class="col">
+        <label for="amount">Menge</label>
+        <input type="number" step="0.00000001" id="amount" placeholder="z.B. 0.25" />
+      </div>
+      <div class="col">
+        <label for="invested">Investiert (€)</label>
+        <input type="number" step="0.01" id="invested" placeholder="z.B. 1500" />
+      </div>
+    </div>
+    <div class="row">
+      <div class="col">
+        <label for="platform">Plattform (optional)</label>
+        <input type="text" id="platform" placeholder="Ledger, Bitvavo, eToro, Pionex..." />
+      </div>
+    </div>
+    <button id="addTradeBtn">Trade hinzufügen</button>
+  </div>
+
+  <!-- Live Preise & Portfolio-Kennzahlen -->
+  <div class="card">
+    <div class="inline-actions">
+      <div>
+        <h2 style="display:inline;">Portfolio-Übersicht</h2>
+        <span class="pill">Währung: EUR</span>
+      </div>
+      <div>
+        <button class="secondary" id="refreshPricesBtn">Preise aktualisieren</button>
+      </div>
+    </div>
+    <p class="muted" id="priceStatus" style="font-size:0.75rem;margin-top:4px;">
+      Lade Live-Preise von CoinGecko…
+    </p>
+
+    <h3 style="margin-top:10px;">Pro Coin</h3>
+    <div style="overflow-x:auto;">
+      <table id="summaryTable">
+        <thead>
+          <tr>
+            <th class="left">Coin</th>
+            <th>Menge</th>
+            <th>Ø Einkauf</th>
+            <th>Aktuell</th>
+            <th>Investiert</th>
+            <th>Wert aktuell</th>
+            <th>PnL €</th>
+            <th>PnL %</th>
+          </tr>
+        </thead>
+        <tbody id="summaryBody">
+          <!-- wird per JS gefüllt -->
+        </tbody>
+      </table>
+    </div>
+
+    <h3 style="margin-top:10px;">Gesamt</h3>
+    <div id="portfolioTotals" style="font-size:0.9rem;">
+      <!-- wird per JS gefüllt -->
+    </div>
+  </div>
+
+  <!-- Trade-Liste -->
+  <div class="card">
+    <div class="inline-actions">
+      <h2>Trades</h2>
+      <button class="danger" id="clearAllBtn">Alle Trades löschen</button>
+    </div>
+    <p class="muted" style="font-size:0.75rem;margin-top:4px;">
+      Daten werden nur lokal im Browser (localStorage) gespeichert.
+    </p>
+    <div style="overflow-x:auto;margin-top:8px;">
+      <table>
+        <thead>
+          <tr>
+            <th class="left">Datum</th>
+            <th class="left">Coin</th>
+            <th>Menge</th>
+            <th>Investiert (€)</th>
+            <th>Preis/Einheit</th>
+            <th class="left">Plattform</th>
+            <th>Aktion</th>
+          </tr>
+        </thead>
+        <tbody id="tradesBody">
+          <!-- wird per JS gefüllt -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="footer">
+    Live-Preise von CoinGecko · Nur zu Informationszwecken, keine Anlageberatung.
+  </div>
+
+  <script>
+    // --- Konfiguration & Storage Keys ---
+    const LOCAL_STORAGE_TRADES_KEY = "cryptoTrades_v1";
+    const LOCAL_STORAGE_COINS_KEY = "cryptoCoins_v1";
+
+    // Standard-Coins (werden beim ersten Start gespeichert)
+    const DEFAULT_COINS = {
+      BTC: { id: "bitcoin", name: "Bitcoin" },
+      ETH: { id: "ethereum", name: "Ethereum" },
+      SOL: { id: "solana", name: "Solana" },
+      XRP: { id: "ripple", name: "XRP" }
+    };
+
+    let trades = [];
+    let coinsConfig = {};
+    let pricesEUR = {};
+
+    // --- Utils ---
+    function loadTrades() {
+      const raw = localStorage.getItem(LOCAL_STORAGE_TRADES_KEY);
+      if (!raw) {
+        trades = [];
+        return;
+      }
+      try {
+        trades = JSON.parse(raw) || [];
+      } catch (e) {
+        console.error("Fehler beim Laden der Trades:", e);
+        trades = [];
+      }
+    }
+
+    function saveTrades() {
+      localStorage.setItem(LOCAL_STORAGE_TRADES_KEY, JSON.stringify(trades));
+    }
+
+    function loadCoinsConfig() {
+      const raw = localStorage.getItem(LOCAL_STORAGE_COINS_KEY);
+      if (!raw) {
+        coinsConfig = DEFAULT_COINS;
+        saveCoinsConfig();
+        return;
+      }
+      try {
+        coinsConfig = JSON.parse(raw) || DEFAULT_COINS;
+      } catch (e) {
+        console.error("Fehler beim Laden der Coins:", e);
+        coinsConfig = DEFAULT_COINS;
+        saveCoinsConfig();
+      }
+    }
+
+    function saveCoinsConfig() {
+      localStorage.setItem(LOCAL_STORAGE_COINS_KEY, JSON.stringify(coinsConfig));
+    }
+
+    function formatNumber(value, decimals) {
+      if (decimals === undefined) decimals = 2;
+      if (value === null || value === undefined || isNaN(value)) return "-";
+      return Number(value).toLocaleString("de-DE", {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals
+      });
+    }
+
+    function nowDateString() {
+      const d = new Date();
+      const day = String(d.getDate()).padStart(2, "0");
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const year = d.getFullYear();
+      const hours = String(d.getHours()).padStart(2, "0");
+      const minutes = String(d.getMinutes()).padStart(2, "0");
+      return day + "." + month + "." + year + " " + hours + ":" + minutes;
+    }
+
+    // --- Coins UI ---
+    function renderCoins() {
+      const tbody = document.getElementById("coinsBody");
+      tbody.innerHTML = "";
+
+      const symbols = Object.keys(coinsConfig).sort();
+
+      if (symbols.length === 0) {
+        const tr = document.createElement("tr");
+        const td = document.createElement("td");
+        td.colSpan = 4;
+        td.textContent = "Noch keine Coins angelegt.";
+        td.classList.add("left");
+        tr.appendChild(td);
+        tbody.appendChild(tr);
+      } else {
+        symbols.forEach(function(symbol) {
+          const cfg = coinsConfig[symbol];
+          const tr = document.createElement("tr");
+
+          const tdSymbol = document.createElement("td");
+          tdSymbol.textContent = symbol;
+          tdSymbol.classList.add("left");
+
+          const tdName = document.createElement("td");
+          tdName.textContent = cfg.name || "-";
+          tdName.classList.add("left");
+
+          const tdId = document.createElement("td");
+          tdId.textContent = cfg.id || "-";
+          tdId.classList.add("left");
+
+          const tdAction = document.createElement("td");
+          const btnDel = document.createElement("button");
+          btnDel.textContent = "X";
+          btnDel.classList.add("danger");
+          btnDel.onclick = function() {
+            if (!confirm("Coin " + symbol + " wirklich löschen? (Trades bleiben erhalten)")) return;
+            delete coinsConfig[symbol];
+            saveCoinsConfig();
+            refreshCoinSelect();
+            renderCoins();
+            fetchPrices();
+          };
+          tdAction.appendChild(btnDel);
+
+          tr.appendChild(tdSymbol);
+          tr.appendChild(tdName);
+          tr.appendChild(tdId);
+          tr.appendChild(tdAction);
+
+          tbody.appendChild(tr);
+        });
+      }
+
+      refreshCoinSelect();
+    }
+
+    function refreshCoinSelect() {
+      const select = document.getElementById("coin");
+      if (!select) return;
+      const prevValue = select.value;
+
+      select.innerHTML = "";
+
+      const symbols = Object.keys(coinsConfig).sort();
+      if (symbols.length === 0) {
+        const opt = document.createElement("option");
+        opt.value = "";
+        opt.textContent = "Keine Coins vorhanden";
+        select.appendChild(opt);
+        select.disabled = true;
+      } else {
+        select.disabled = false;
+        symbols.forEach(function(symbol) {
+          const cfg = coinsConfig[symbol];
+          const opt = document.createElement("option");
+          opt.value = symbol;
+          opt.textContent = cfg.name ? symbol + " · " + cfg.name : symbol;
+          select.appendChild(opt);
+        });
+        if (symbols.indexOf(prevValue) !== -1) {
+          select.value = prevValue;
+        }
+      }
+    }
+
+    // --- Trades UI ---
+    function renderTrades() {
+      const tbody = document.getElementById("tradesBody");
+      tbody.innerHTML = "";
+
+      if (trades.length === 0) {
+        const tr = document.createElement("tr");
+        const td = document.createElement("td");
+        td.colSpan = 7;
+        td.textContent = "Noch keine Trades erfasst.";
+        td.classList.add("left");
+        tr.appendChild(td);
+        tbody.appendChild(tr);
+        return;
+      }
+
+      trades.forEach(function(trade, index) {
+        const tr = document.createElement("tr");
+
+        const tdDate = document.createElement("td");
+        tdDate.textContent = trade.date || "-";
+        tdDate.classList.add("left");
+
+        const tdCoin = document.createElement("td");
+        tdCoin.textContent = trade.coin;
+        tdCoin.classList.add("left");
+
+        const tdAmount = document.createElement("td");
+        tdAmount.textContent = formatNumber(trade.amount, 8);
+
+        const tdInv = document.createElement("td");
+        tdInv.textContent = formatNumber(trade.investedEUR, 2);
+
+        const pricePerUnit = trade.amount > 0 ? trade.investedEUR / trade.amount : null;
+        const tdPpu = document.createElement("td");
+        tdPpu.textContent = formatNumber(pricePerUnit, 2);
+
+        const tdPlatform = document.createElement("td");
+        tdPlatform.textContent = trade.platform || "-";
+        tdPlatform.classList.add("left");
+
+        const tdAction = document.createElement("td");
+        const btn = document.createElement("button");
+        btn.textContent = "X";
+        btn.classList.add("danger");
+        btn.onclick = function() {
+          if (confirm("Diesen Trade wirklich löschen?")) {
+            trades.splice(index, 1);
+            saveTrades();
+            updateAll();
+          }
+        };
+        tdAction.appendChild(btn);
+
+        tr.appendChild(tdDate);
+        tr.appendChild(tdCoin);
+        tr.appendChild(tdAmount);
+        tr.appendChild(tdInv);
+        tr.appendChild(tdPpu);
+        tr.appendChild(tdPlatform);
+        tr.appendChild(tdAction);
+
+        tbody.appendChild(tr);
+      });
+    }
+
+    function computeSummary() {
+      const summary = {};
+      trades.forEach(function(trade) {
+        if (!summary[trade.coin]) {
+          summary[trade.coin] = { amount: 0, invested: 0 };
+        }
+        summary[trade.coin].amount += trade.amount;
+        summary[trade.coin].invested += trade.investedEUR;
+      });
+      return summary;
+    }
+
+    function renderSummary() {
+      const summary = computeSummary();
+      const tbody = document.getElementById("summaryBody");
+      tbody.innerHTML = "";
+
+      let totalInvested = 0;
+      let totalValueNow = 0;
+
+      const symbolsSet = {};
+      Object.keys(coinsConfig).forEach(function(sym) { symbolsSet[sym] = true; });
+      Object.keys(summary).forEach(function(sym) { symbolsSet[sym] = true; });
+      const symbols = Object.keys(symbolsSet).sort();
+
+      symbols.forEach(function(symbol) {
+        const data = summary[symbol] || { amount: 0, invested: 0 };
+        if (data.amount === 0 && data.invested === 0) {
+          return;
+        }
+
+        const avgPrice = data.amount > 0 ? data.invested / data.amount : null;
+        const currentPrice = pricesEUR[symbol] != null ? pricesEUR[symbol] : null;
+        const currentValue = currentPrice !== null ? data.amount * currentPrice : null;
+
+        if (data.invested) totalInvested += data.invested;
+        if (currentValue !== null) totalValueNow += currentValue;
+
+        const pnlAbs = currentValue !== null ? currentValue - data.invested : null;
+        const pnlPct = (currentValue !== null && data.invested > 0)
+          ? (currentValue / data.invested - 1) * 100
+          : null;
+
+        const tr = document.createElement("tr");
+
+        const tdCoin = document.createElement("td");
+        tdCoin.classList.add("left");
+        tdCoin.textContent = symbol;
+
+        const tdAmount = document.createElement("td");
+        tdAmount.textContent = formatNumber(data.amount, 8);
+
+        const tdAvg = document.createElement("td");
+        tdAvg.textContent = formatNumber(avgPrice, 2);
+
+        const tdCur = document.createElement("td");
+        tdCur.textContent = currentPrice !== null ? formatNumber(currentPrice, 2) : "-";
+
+        const tdInv = document.createElement("td");
+        tdInv.textContent = formatNumber(data.invested, 2);
+
+        const tdVal = document.createElement("td");
+        tdVal.textContent = currentValue !== null ? formatNumber(currentValue, 2) : "-";
+
+        const tdPnlEur = document.createElement("td");
+        if (pnlAbs !== null) {
+          tdPnlEur.textContent = formatNumber(pnlAbs, 2);
+          tdPnlEur.classList.add(pnlAbs >= 0 ? "green" : "red");
+        } else {
+          tdPnlEur.textContent = "-";
+        }
+
+        const tdPnlPct = document.createElement("td");
+        if (pnlPct !== null) {
+          tdPnlPct.textContent = formatNumber(pnlPct, 2) + " %";
+          tdPnlPct.classList.add(pnlPct >= 0 ? "green" : "red");
+        } else {
+          tdPnlPct.textContent = "-";
+        }
+
+        tr.appendChild(tdCoin);
+        tr.appendChild(tdAmount);
+        tr.appendChild(tdAvg);
+        tr.appendChild(tdCur);
+        tr.appendChild(tdInv);
+        tr.appendChild(tdVal);
+        tr.appendChild(tdPnlEur);
+        tr.appendChild(tdPnlPct);
+
+        tbody.appendChild(tr);
+      });
+
+      const totalsDiv = document.getElementById("portfolioTotals");
+      let html = "";
+      html += '<div><span class="muted">Investiert gesamt:</span> <strong>' +
+              formatNumber(totalInvested, 2) + " €</strong></div>";
+      html += '<div><span class="muted">Aktueller Wert:</span> <strong>' +
+              formatNumber(totalValueNow, 2) + " €</strong></div>";
+      const totalPnl = totalValueNow - totalInvested;
+      const totalPnlPct = totalInvested > 0 ? (totalValueNow / totalInvested - 1) * 100 : null;
+
+      html += '<div><span class="muted">PnL gesamt:</span> ';
+      if (!isNaN(totalPnl)) {
+        const cls = totalPnl >= 0 ? "green" : "red";
+        html += '<strong class="' + cls + '">' + formatNumber(totalPnl, 2) + " €</strong>";
+        if (totalPnlPct !== null) {
+          html += ' <span class="' + cls + '">(' + formatNumber(totalPnlPct, 2) + " %)</span>";
+        }
+      } else {
+        html += "-";
+      }
+      html += "</div>";
+      totals
