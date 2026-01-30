@@ -682,10 +682,10 @@
         tdAmount.textContent = formatNumber(amount, 8);
 
         var tdAvg = document.createElement("td");
-        tdAvg.textContent = formatNumber(avgPriceDisplay, 2);
+        tdAvg.textContent = formatNumber(avgPriceDisplay, 3);
 
         var tdCur = document.createElement("td");
-        tdCur.textContent = formatNumber(currentPriceDisplay, 2);
+        tdCur.textContent = formatNumber(currentPriceDisplay, 3);
 
         var tdInv = document.createElement("td");
         tdInv.textContent = (basisDisplay != null && !isNaN(basisDisplay))
